@@ -57,6 +57,10 @@ Example:
 
 Only the year is stored for `Volunteering since`.
 
+The school field may be left empty if it is not applicable.
+
+Volunteer accounts are not permanently deleted in V1. Former volunteers are deactivated instead.
+
 ---
 
 ## 3.2 Username Generation
@@ -89,6 +93,8 @@ Examples:
 - `ahadzic1`
 - `ahadzic2`
 
+Volunteer usernames must be unique.
+
 Once assigned, the username does not automatically change if the volunteer's name is later edited.
 
 Admins do not manually select volunteer usernames in V1.
@@ -109,6 +115,8 @@ The admin can copy these credentials and provide them to the volunteer.
 The temporary password should only be shown at the time it is generated.
 
 The volunteer must choose a new password on their first login.
+
+If a new temporary password is generated later, any previous temporary password must immediately stop working.
 
 ---
 
@@ -146,6 +154,20 @@ These protected values can only be changed by admins.
 
 ---
 
+## 3.6 Volunteer Data Validation
+
+The system should prevent obviously invalid profile values.
+
+Examples:
+
+- Year of birth must be a plausible year
+- Volunteering since year cannot be later than the current year
+- Volunteering since year should not be earlier than the volunteer's birth year
+
+Exact validation boundaries may be implemented conservatively rather than using overly restrictive assumptions.
+
+---
+
 # 4. Inactive Volunteers
 
 Former volunteers must not be deleted from the system.
@@ -156,6 +178,7 @@ An inactive volunteer:
 
 - Cannot log in
 - Cannot RSVP
+- Cannot change existing RSVPs
 - Cannot participate in new event workflows
 
 Historical data must remain preserved, including:
@@ -164,12 +187,19 @@ Historical data must remain preserved, including:
 - Attendance records
 - Volunteering hours
 - Historical event participation
+- Existing historical RSVP records
+
+Deactivating a volunteer must not erase or alter their existing RSVP, attendance, or hour records.
 
 Inactive volunteers remain accessible to admins.
 
 They may later be reactivated if necessary.
 
+Reactivation restores account access but does not modify historical RSVP, attendance, or volunteering-hour records.
+
 Inactive volunteers should not appear in the normal active-volunteer list. Admins can access them through a separate `Show inactive volunteers` area.
+
+Inactive volunteers must still appear by name in historical event and attendance records.
 
 ---
 
@@ -197,6 +227,8 @@ When creating an admin, the creator provides:
 
 The admin username may be entered manually because the number of admin accounts will be very small.
 
+Admin usernames must be unique.
+
 The system generates a temporary password.
 
 The new admin must change the password after their first login.
@@ -209,6 +241,8 @@ Admins can reset another admin's password.
 
 The system generates a temporary password and requires the affected admin to change it on their next login.
 
+Generating a new temporary password immediately invalidates the previous password or temporary password being replaced.
+
 ---
 
 ## 5.3 Admin Deactivation
@@ -218,6 +252,8 @@ Admins can be deactivated.
 A deactivated admin can no longer access the admin portal.
 
 The system must prevent the last active admin account from being deactivated.
+
+This protection must apply to any future account-removal functionality as well.
 
 An admin should also not be able to deactivate their own account while logged in. Another admin must perform that action.
 
@@ -310,6 +346,8 @@ If the next event is cancelled, the cancellation must be displayed prominently.
 A cancelled event may remain visible on Home until its originally scheduled end time plus the event buffer defined by the system.
 
 After that point, Home should move to the next relevant upcoming event.
+
+Volunteers cannot change RSVP responses while an event is cancelled.
 
 ---
 
@@ -440,6 +478,8 @@ You can change your response until
 16 October 2026 at 10:00.
 ```
 
+If the event is cancelled, RSVP controls are disabled.
+
 ---
 
 ## 9.2 Past Event Details
@@ -519,6 +559,8 @@ ACCOUNT
 [ Change password ]
 [ Change profile picture ]
 ```
+
+If no profile picture exists, the UI should show a default avatar or initials rather than a broken or empty image.
 
 ---
 
@@ -838,6 +880,8 @@ Deactivation prevents login and future event participation.
 
 Historical data remains preserved.
 
+Existing historical RSVP and attendance records remain intact.
+
 Inactive volunteers can be reactivated.
 
 ---
@@ -895,7 +939,7 @@ The Create Event form contains:
 - RSVP deadline
 - Description
 
-Description is optional.
+Description is optional and may be empty.
 
 Example:
 
@@ -950,7 +994,16 @@ Expected volunteering time:
 
 5 hours
 
-Decimal values such as `4.5` or `5.5` must be supported.
+Decimal values must be supported.
+
+For V1, volunteering time should support practical half-hour increments such as:
+
+- 4
+- 4.5
+- 5
+- 5.5
+
+The underlying implementation should still use a numeric representation that can safely support future changes in precision.
 
 ---
 
@@ -960,13 +1013,19 @@ The system should prevent invalid event data.
 
 Examples:
 
-- End before start
+- End timestamp before or equal to start timestamp
 - RSVP deadline after the event start
 - Negative expected hours
 - Missing event name
 - Missing location
 
 An RSVP deadline equal to the event start is allowed.
+
+Overnight or multi-day events are valid as long as:
+
+`ends_at > starts_at`
+
+If an admin changes the event start time and the existing RSVP deadline becomes invalid, the admin must correct the RSVP deadline before saving.
 
 ---
 
@@ -1009,10 +1068,16 @@ Admins may edit event information after volunteers have already submitted RSVPs.
 
 Existing RSVP responses remain intact.
 
+Changing the event's date, time, location, description, or other general information does not clear existing RSVP responses.
+
+Volunteers should immediately see the updated event information.
+
 If the RSVP deadline is moved:
 
 - Into the future after previously closing, RSVP reopens
 - Into the past, RSVP closes immediately
+
+If the new event timing makes the RSVP deadline invalid, saving must be blocked until the deadline is corrected.
 
 ---
 
@@ -1035,6 +1100,8 @@ After the first volunteer receives actual hours:
 Expected time is locked.
 
 Individual actual hours remain editable.
+
+Changing an attendance status later does not unlock the event's expected volunteering time.
 
 ---
 
@@ -1066,7 +1133,11 @@ Attendance records may still be edited after this point.
 
 # 24. RSVP System
 
-Each volunteer can have one RSVP response per event.
+Each volunteer can have at most one RSVP record per event.
+
+The database must enforce uniqueness for:
+
+`event + volunteer`
 
 Possible states:
 
@@ -1083,6 +1154,8 @@ Admins may override an RSVP after the deadline if necessary.
 RSVP status never determines whether attendance may later be recorded.
 
 A person who answered `No` or did not respond may still attend and receive volunteering hours.
+
+Deactivating a volunteer does not erase their existing RSVP records.
 
 ---
 
@@ -1106,7 +1179,11 @@ Admins may see all RSVP identities.
 
 Attendance is separate from RSVP.
 
-Each volunteer can have one attendance record per event.
+Each volunteer can have at most one attendance record per event.
+
+The database must enforce uniqueness for:
+
+`event + volunteer`
 
 Internal attendance states are:
 
@@ -1184,6 +1261,10 @@ Actual time:
 
 5.5 hours
 
+A volunteer may be marked `Attended` with `0` credited hours if there is a legitimate reason.
+
+Actual hours may never be negative.
+
 ---
 
 ## 28.2 Absent
@@ -1200,6 +1281,36 @@ When `Absent` is selected:
 `Not recorded` means attendance has not yet been processed.
 
 It does not count as either attended or absent.
+
+No volunteering hours are counted.
+
+---
+
+## 28.4 Attendance State Changes
+
+Attendance transitions must behave consistently.
+
+```text
+Not recorded → Attended
+Default hours = event expected hours
+
+Not recorded → Absent
+Hours = 0
+
+Attended → Absent
+Hours = 0
+
+Absent → Attended
+Default hours = event expected hours
+
+Attended → Not recorded
+Clear actual hours
+
+Absent → Not recorded
+Clear actual hours
+```
+
+If the admin changes from `Absent` back to `Attended`, expected hours are used as the default again, but the admin may edit the value afterward.
 
 ---
 
@@ -1219,6 +1330,15 @@ Attendance recorded: 16 / 22
 
 No separate `6 not recorded` counter is necessary.
 
+For V1:
+
+- `X` = number of volunteers whose attendance has been explicitly recorded as either `Attended` or `Absent`
+- `Y` = number of volunteers currently relevant to the attendance workflow for that event
+
+Inactive volunteers who are not part of that event must not inflate the denominator.
+
+Unexpected attendees explicitly added to the event are included in the attendance workflow.
+
 ---
 
 # 30. Unexpected Attendees
@@ -1234,6 +1354,10 @@ The admin may search/select an active volunteer who did not originally confirm a
 The volunteer may then be marked as attended and receive actual hours.
 
 Their original RSVP status remains historically accurate.
+
+If the selected volunteer already exists in the attendance table under `Not coming` or `No response`, the system must not create a duplicate record.
+
+Instead, the UI should navigate to or highlight that existing row.
 
 ---
 
@@ -1261,6 +1385,8 @@ The system should not rely on one large `Save Attendance` button.
 
 This prevents the admin from losing progress if the page is closed during an event.
 
+A small saved-state indicator may be used.
+
 ---
 
 # 33. Attendance Corrections
@@ -1277,6 +1403,10 @@ There is no finalization lock.
 
 Historical corrections must remain possible.
 
+If multiple admins edit the same attendance record at nearly the same time, V1 may use a simple latest-saved-value-wins approach.
+
+Advanced conflict resolution is not required.
+
 ---
 
 # 34. Volunteering Hours
@@ -1287,11 +1417,13 @@ The system must not maintain a manually editable authoritative `total_hours` val
 
 A volunteer's total volunteering time is derived from the sum of their actual attendance hours.
 
-Example:
+Conceptually:
 
 ```text
 SUM(attendance.hours)
 ```
+
+Only attended records contribute positive volunteering hours.
 
 This ensures totals cannot drift away from the underlying history.
 
@@ -1313,7 +1445,15 @@ Events can be cancelled by admins.
 
 A cancelled event must be clearly marked as cancelled.
 
-There are conceptually two situations:
+While an event is cancelled:
+
+- Volunteer RSVP editing is disabled
+- Attendance remains accessible to admins
+- Historical RSVP data remains preserved
+- The event may be restored
+- Permanent deletion remains subject to attendance-record rules
+
+There are conceptually two situations.
 
 ## 36.1 Cancelled Before Starting
 
@@ -1343,9 +1483,18 @@ Cancelled events can be restored.
 
 This supports accidental cancellations or events that are reinstated.
 
-Restoring an event does not automatically reopen RSVP.
+A cancelled event may be restored at any time.
+
+Restoring an event:
+
+- Preserves all existing RSVP records
+- Preserves attendance records
+- Preserves event information
+- Does not automatically reopen RSVP
 
 If the RSVP deadline has already passed, RSVP remains closed unless the admin also changes the deadline.
+
+The event's timestamps still determine whether it is displayed as upcoming, happening now, or past.
 
 ---
 
@@ -1355,7 +1504,10 @@ An event may be permanently deleted only when there are no attendance/hour recor
 
 RSVP records alone do not prevent deletion.
 
-If an event is deleted, associated RSVP records may also be deleted.
+If an event is deleted:
+
+- Associated RSVP records should be deleted automatically
+- No orphaned RSVP records may remain
 
 If attendance records exist, deletion must be blocked.
 
@@ -1377,6 +1529,8 @@ Volunteers may upload or change their own profile picture.
 Admins can view profile pictures.
 
 Profile pictures must not become part of a publicly browsable volunteer directory.
+
+If a profile picture does not exist, a default avatar or initials should be displayed.
 
 ---
 
@@ -1436,10 +1590,30 @@ The application must follow basic security requirements.
 - Use Supabase Row Level Security
 - Restrict volunteer data access appropriately
 - Protect admin-only operations server-side
+- Enforce unique usernames where required
+- Enforce one RSVP record per volunteer per event
+- Enforce one attendance record per volunteer per event
 
 ---
 
-# 43. Out of Scope for V1
+# 43. Data Integrity Principles
+
+The application should prefer preserving historical accuracy over silently rewriting history.
+
+Examples:
+
+- Changing a volunteer's name must not rewrite their username automatically
+- Deactivating a volunteer must not erase historical attendance
+- Changing event information must not erase RSVP responses
+- Adding an unexpected attendee must not rewrite their original RSVP
+- Restoring an event must not reset its RSVP records
+- Volunteering totals must come from attendance records rather than a separately edited total
+
+Related records must not be left orphaned when parent data is deleted.
+
+---
+
+# 44. Out of Scope for V1
 
 The following features are intentionally excluded from V1:
 
@@ -1461,12 +1635,14 @@ The following features are intentionally excluded from V1:
 - Yearly volunteering-hour totals
 - Detailed analytics dashboards
 - Badges or achievements
+- Advanced concurrent-edit conflict handling
+- Permanent volunteer-account deletion
 
 These may be considered in future versions if a genuine need appears.
 
 ---
 
-# 44. Future Features
+# 45. Future Features
 
 Possible future additions include:
 
@@ -1484,7 +1660,7 @@ Future features must not influence V1 complexity unless required by the current 
 
 ---
 
-# 45. V1 Screen Map
+# 46. V1 Screen Map
 
 ## Volunteer
 
@@ -1516,7 +1692,7 @@ Admin
 
 ---
 
-# 46. Core Product Principle
+# 47. Core Product Principle
 
 V1 should remain small, reliable, and easy to understand.
 
@@ -1531,3 +1707,11 @@ The priority is:
 5. Accurate volunteering-hour history
 
 Everything else is secondary.
+
+When a behavior is not explicitly defined in this specification, implementation should favor the simplest behavior that:
+
+- Preserves historical data
+- Does not expose private information
+- Does not create duplicate records
+- Does not silently alter volunteering hours
+- Does not introduce a new product feature
