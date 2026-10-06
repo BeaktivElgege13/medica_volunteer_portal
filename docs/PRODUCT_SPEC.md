@@ -1145,6 +1145,8 @@ Possible states:
 - No
 - No response
 
+`No response` means the volunteer never submitted an RSVP. It remains distinct from an explicit `No` response for historical accuracy, even though both are treated as not expected to attend unless the volunteer later appears as an unexpected attendee.
+
 A volunteer may freely change between Yes and No until the RSVP deadline.
 
 After the deadline, the response becomes locked for the volunteer.
@@ -1233,11 +1235,15 @@ NO RESPONSE
 Nina Alić        Not recorded     —          Add
 ```
 
-The three RSVP groups are:
+The RSVP-related views are:
 
 - Coming
 - Not coming
 - No response
+
+`Coming` and `Not coming` are part of the normal attendance-processing workflow.
+
+`No response` remains visible to admins for reference, but those volunteers are not included in the attendance-processing total by default. If a volunteer with no response actually appears, the admin adds them as an unexpected attendee.
 
 All relevant active volunteers remain eligible for attendance regardless of RSVP status.
 
@@ -1332,12 +1338,13 @@ No separate `6 not recorded` counter is necessary.
 
 For V1:
 
-- `X` = number of volunteers whose attendance has been explicitly recorded as either `Attended` or `Absent`
-- `Y` = number of volunteers currently relevant to the attendance workflow for that event
+- `X` = number of volunteers in the attendance workflow whose attendance has been explicitly recorded as either `Attended` or `Absent`
+- `Y` = volunteers who RSVP'd `Yes` + volunteers who RSVP'd `No` + volunteers explicitly added as unexpected attendees
+- Volunteers with `No response` are not included in `Y` unless they are added as unexpected attendees
 
 Inactive volunteers who are not part of that event must not inflate the denominator.
 
-Unexpected attendees explicitly added to the event are included in the attendance workflow.
+Unexpected attendees explicitly added to the event are included in the attendance workflow and therefore increase `Y`.
 
 ---
 
@@ -1351,13 +1358,15 @@ An admin can select:
 
 The admin may search/select an active volunteer who did not originally confirm attendance.
 
+This includes volunteers who RSVP'd `No` and volunteers who gave `No response`.
+
 The volunteer may then be marked as attended and receive actual hours.
 
 Their original RSVP status remains historically accurate.
 
-If the selected volunteer already exists in the attendance table under `Not coming` or `No response`, the system must not create a duplicate record.
+If the selected volunteer already has an attendance row or is already present in the attendance-processing workflow, the system must not create a duplicate record.
 
-Instead, the UI should navigate to or highlight that existing row.
+Instead, the UI should navigate to or highlight the existing entry. A `No response` volunteer becomes part of the attendance-processing workflow only when explicitly added as an unexpected attendee.
 
 ---
 
